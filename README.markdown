@@ -1,4 +1,5 @@
-# Warning: This fork is not being actively maintained.
+
+## Sparkle fork to update the project to XCode 5, ARC and OSX 10.9
 
 # Sparkle 
 is an easy-to-use software update framework for Cocoa developers.
