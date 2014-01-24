@@ -33,36 +33,45 @@ extern OSStatus SecStaticCodeCheckValidityWithErrors(SecStaticCodeRef staticCode
     
     result = SecCodeCopySelf(kSecCSDefaultFlags, &hostCode);
     if (result != 0) {
-        SULog(@"Failed to copy host code %d", result);
-        goto finally;
+		    SULog(@"Failed to copy host code %d", result);
+		    if (hostCode) CFRelease(hostCode);
+        if (staticCode) CFRelease(staticCode);
+        if (requirement) CFRelease(requirement);
+        return (result == 0);
     }
     
     result = SecCodeCopyDesignatedRequirement(hostCode, kSecCSDefaultFlags, &requirement);
     if (result != 0) {
         SULog(@"Failed to copy designated requirement %d", result);
-        goto finally;
+		    if (hostCode) CFRelease(hostCode);
+        if (staticCode) CFRelease(staticCode);
+        if (requirement) CFRelease(requirement);
+        return (result == 0);
     }
     
     NSBundle *newBundle = [NSBundle bundleWithPath:destinationPath];
     if (!newBundle) {
         SULog(@"Failed to load NSBundle for update");
         result = -1;
-        goto finally;
+		    if (hostCode) CFRelease(hostCode);
+        if (staticCode) CFRelease(staticCode);
+        if (requirement) CFRelease(requirement);
+        return (result == 0);
     }
     
-    result = SecStaticCodeCreateWithPath((CFURLRef)[newBundle executableURL], kSecCSDefaultFlags, &staticCode);
+    result = SecStaticCodeCreateWithPath((__bridge CFURLRef)[newBundle executableURL], kSecCSDefaultFlags, &staticCode);
     if (result != 0) {
         SULog(@"Failed to get static code %d", result);
-        goto finally;
+		    if (hostCode) CFRelease(hostCode);
+        if (staticCode) CFRelease(staticCode);
+        if (requirement) CFRelease(requirement);
+        return (result == 0);
     }
-    
-    result = SecStaticCodeCheckValidityWithErrors(staticCode, kSecCSDefaultFlags | kSecCSCheckAllArchitectures, requirement, (CFErrorRef *)error);
-    if (result != 0 && error) [*error autorelease];
-    
-finally:
-    if (hostCode) CFRelease(hostCode);
-    if (staticCode) CFRelease(staticCode);
-    if (requirement) CFRelease(requirement);
+		
+		CFErrorRef cfError = NULL;
+    result = SecStaticCodeCheckValidityWithErrors(staticCode, kSecCSDefaultFlags | kSecCSCheckAllArchitectures, requirement, &cfError);
+		if(cfError && error != NULL)
+			*error = (__bridge NSError *)cfError;
     return (result == 0);
 }
 

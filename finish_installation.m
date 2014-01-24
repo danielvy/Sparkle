@@ -48,7 +48,7 @@
 	executablepath	= execpath;
 	parentprocessid	= ppid;
 	folderpath		= infolderpath;
-	selfPath		= [inSelfPath retain];
+	selfPath		= inSelfPath;
     shouldRelaunch  = relaunch;
 	
 	BOOL	alreadyTerminated = (getppid() == 1); // ppid is launchd (1) => parent terminated already
@@ -56,7 +56,7 @@
 	if( alreadyTerminated )
 		[self parentHasQuit];
 	else
-		watchdogTimer = [[NSTimer scheduledTimerWithTimeInterval:CHECK_FOR_PARENT_TO_QUIT_TIME target:self selector:@selector(watchdog:) userInfo:nil repeats:YES] retain];
+		watchdogTimer = [NSTimer scheduledTimerWithTimeInterval:CHECK_FOR_PARENT_TO_QUIT_TIME target:self selector:@selector(watchdog:) userInfo:nil repeats:YES];
 
 	return self;
 }
@@ -65,30 +65,24 @@
 -(void)	dealloc
 {
 	[longInstallationTimer invalidate];
-	[longInstallationTimer release];
 	longInstallationTimer = nil;
 
-	[selfPath release];
 	selfPath = nil;
     
-    [installationPath release];
 
-	[watchdogTimer release];
 	watchdogTimer = nil;
 
-	[host release];
 	host = nil;
 	
-	[super dealloc];
 }
 
 
 -(void)	parentHasQuit
 {
 	[watchdogTimer invalidate];
-	longInstallationTimer = [[NSTimer scheduledTimerWithTimeInterval: LONG_INSTALLATION_TIME
+	longInstallationTimer = [NSTimer scheduledTimerWithTimeInterval: LONG_INSTALLATION_TIME
 								target: self selector: @selector(showAppIconInDock:)
-								userInfo:nil repeats:NO] retain];
+								userInfo:nil repeats:NO];
 
 	if( folderpath )
 		[self install];
@@ -180,35 +174,35 @@ int main (int argc, const char * argv[])
 	if( argc < 5 || argc > 6 )
 		return EXIT_FAILURE;
 	
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	@autoreleasepool {
 	
 	//ProcessSerialNumber		psn = { 0, kCurrentProcess };
 	//TransformProcessType( &psn, kProcessTransformToForegroundApplication );
-	[[NSApplication sharedApplication] activateIgnoringOtherApps: YES];
+		[[NSApplication sharedApplication] activateIgnoringOtherApps: YES];
+			
+		#if 0	// Cmdline tool
+		NSString*	selfPath = nil;
+		if( argv[0][0] == '/' )
+			selfPath = [[NSFileManager defaultManager] stringWithFileSystemRepresentation: argv[0] length: strlen(argv[0])];
+		else
+		{
+			selfPath = [[NSFileManager defaultManager] currentDirectoryPath];
+			selfPath = [selfPath stringByAppendingPathComponent: [[NSFileManager defaultManager] stringWithFileSystemRepresentation: argv[0] length: strlen(argv[0])]];
+		}
+		#else
+		NSString*	selfPath = [[NSBundle mainBundle] bundlePath];
+		#endif
 		
-	#if 0	// Cmdline tool
-	NSString*	selfPath = nil;
-	if( argv[0][0] == '/' )
-		selfPath = [[NSFileManager defaultManager] stringWithFileSystemRepresentation: argv[0] length: strlen(argv[0])];
-	else
-	{
-		selfPath = [[NSFileManager defaultManager] currentDirectoryPath];
-		selfPath = [selfPath stringByAppendingPathComponent: [[NSFileManager defaultManager] stringWithFileSystemRepresentation: argv[0] length: strlen(argv[0])]];
-	}
-	#else
-	NSString*	selfPath = [[NSBundle mainBundle] bundlePath];
-	#endif
-	
-	[NSApplication sharedApplication];
-	[[[TerminationListener alloc] initWithHostPath: (argc > 1) ? argv[1] : NULL
+		[NSApplication sharedApplication];
+		TerminationListener *terminationListener __attribute__((unused)) = [[TerminationListener alloc] initWithHostPath: (argc > 1) ? argv[1] : NULL
                                     executablePath: (argc > 2) ? argv[2] : NULL
                                    parentProcessId: (argc > 3) ? atoi(argv[3]) : 0
                                         folderPath: (argc > 4) ? argv[4] : NULL
                                     shouldRelaunch: (argc > 5) ? atoi(argv[5]) : 1
-                                          selfPath: selfPath] autorelease];
-	[[NSApplication sharedApplication] run];
+                                          selfPath: selfPath];
+		[[NSApplication sharedApplication] run];
 	
-	[pool drain];
+	}
 	
 	return EXIT_SUCCESS;
 }

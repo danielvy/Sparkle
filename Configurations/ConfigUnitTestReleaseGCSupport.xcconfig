@@ -1,3 +1,2 @@
 #include "ConfigUnitTestRelease.xcconfig"
 
-GCC_ENABLE_OBJC_GC = required

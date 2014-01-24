@@ -64,7 +64,7 @@
 
 - (void)updateAlert:(SUUpdateAlert *)alert finishedWithChoice:(SUUpdateAlertChoice)choice
 {
-	[updateAlert release]; updateAlert = nil;
+	 updateAlert = nil;
 	[host setObject:nil forUserDefaultsKey:SUSkippedVersionKey];
 	switch (choice)
 	{
@@ -164,12 +164,11 @@
 - (void)unarchiver:(SUUnarchiver *)unarchiver requiresPasswordReturnedViaInvocation:(NSInvocation *)invocation
 {
     SUPasswordPrompt *prompt = [[SUPasswordPrompt alloc] initWithHost:host];
-    NSString *password = nil;
+    NSString * __unsafe_unretained password = nil;
     if([prompt run]) 
     {
         password = [prompt password];
     }
-    [prompt release];
     [invocation setArgument:&password atIndex:2];
     [invocation invoke];
 }
@@ -194,7 +193,6 @@
 	if (statusController)
 	{
 		[statusController close];
-		[statusController autorelease];
 		statusController = nil;
 	}
 }
@@ -211,7 +209,6 @@
 	if (statusController)
 	{
 		[statusController close];
-		[statusController autorelease];
 		statusController = nil;
 	}
 	[super abortUpdate];
