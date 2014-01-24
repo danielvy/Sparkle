@@ -112,8 +112,10 @@
         if( !folderpath || strcmp(executablepath, hostpath) != 0 )
             appPath = [[NSFileManager defaultManager] stringWithFileSystemRepresentation:executablepath length:strlen(executablepath)];
         else
-            appPath = installationPath;
-        [[NSWorkspace sharedWorkspace] openFile: appPath];
+            appPath = [host installationPath];
+        
+        NSRunningApplication *relaunchedApplication = [[NSWorkspace sharedWorkspace] launchApplicationAtURL:[NSURL fileURLWithPath:appPath] options:NSWorkspaceLaunchDefault configuration:nil error:NULL];
+        [relaunchedApplication activateWithOptions:NSApplicationActivateIgnoringOtherApps];
     }
 
     if (folderpath)
@@ -140,7 +142,7 @@
 	
     // Perhaps a poor assumption but: if we're not relaunching, we assume we shouldn't be showing any UI either. Because non-relaunching installations are kicked off without any user interaction, we shouldn't be interrupting them.
     if (shouldRelaunch) {
-        SUStatusController*	statusCtl = [[SUStatusController alloc] initWithHost: host];	// We quit anyway after we've installed, so leak this for now.
+        SUStatusController*	statusCtl = [[[SUStatusController alloc] initWithHost: host] autorelease];	// We quit anyway after we've installed, so leak this for now.
         [statusCtl setButtonTitle: SULocalizedString(@"Cancel Update",@"") target: nil action: Nil isDefault: NO];
         [statusCtl beginActionWithTitle: SULocalizedString(@"Installing update...",@"")
                         maxProgressValue: 0 statusText: @""];
@@ -178,6 +180,7 @@ int main (int argc, const char * argv[])
 	
 	//ProcessSerialNumber		psn = { 0, kCurrentProcess };
 	//TransformProcessType( &psn, kProcessTransformToForegroundApplication );
+    [[NSApplication sharedApplication] setActivationPolicy:NSApplicationActivationPolicyRegular];
 		[[NSApplication sharedApplication] activateIgnoringOtherApps: YES];
 			
 		#if 0	// Cmdline tool

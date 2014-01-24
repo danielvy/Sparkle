@@ -20,6 +20,7 @@
 #import "SUBinaryDeltaCommon.h"
 #import "SUCodeSigningVerifier.h"
 #import "SUUpdater_Private.h"
+#import "SUXPC.h"
 
 @interface SUBasicUpdateDriver () <NSURLDownloadDelegate>; @end
 
@@ -98,6 +99,9 @@
 {
 	if ([[updater delegate] respondsToSelector:@selector(updater:didFinishLoadingAppcast:)])
 		[[updater delegate] updater:updater didFinishLoadingAppcast:ac];
+	
+	NSDictionary *userInfo = (ac != nil) ? @{SUUpdaterAppcastNotificationKey : ac} : nil;
+	[[NSNotificationCenter defaultCenter] postNotificationName:SUUpdaterDidFinishLoadingAppCastNotification object:updater userInfo:userInfo];
     
     SUAppcastItem *item = nil;
     
@@ -143,6 +147,8 @@
 {
 	if ([[updater delegate] respondsToSelector:@selector(updater:didFindValidUpdate:)])
 		[[updater delegate] updater:updater didFindValidUpdate:updateItem];
+	NSDictionary *userInfo = (updateItem != nil) ? @{SUUpdaterAppcastItemNotificationKey : updateItem} : nil;
+	[[NSNotificationCenter defaultCenter] postNotificationName:SUUpdaterDidFinishLoadingAppCastNotification object:updater userInfo:userInfo];
 	[self downloadUpdate];
 }
 
@@ -150,6 +156,8 @@
 {
 	if ([[updater delegate] respondsToSelector:@selector(updaterDidNotFindUpdate:)])
 		[[updater delegate] updaterDidNotFindUpdate:updater];
+	[[NSNotificationCenter defaultCenter] postNotificationName:SUUpdaterDidNotFindUpdateNotification object:updater];
+	
 	[self abortUpdateWithError:[NSError errorWithDomain:SUSparkleErrorDomain code:SUNoUpdateError userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:SULocalizedString(@"You already have the newest version of %@.", nil), [host name]] forKey:NSLocalizedDescriptionKey]]];
 }
 
@@ -292,6 +300,10 @@
         [self abortUpdate];
         return;
     }
+	
+	BOOL running10_7 = floor(NSAppKitVersionNumber) > NSAppKitVersionNumber10_6;
+	BOOL useXPC = running10_7 && [[NSFileManager defaultManager] fileExistsAtPath:
+								  [[host bundlePath] stringByAppendingPathComponent:@"Contents/XPCServices/com.andymatuschak.Sparkle.SandboxService.xpc"]];
     
     // Give the host app an opportunity to postpone the install and relaunch.
     static BOOL postponedOnce = NO;
@@ -322,8 +334,13 @@
 #endif
 
 	// Only the paranoid survive: if there's already a stray copy of relaunch there, we would have problems.
-	if( [SUPlainInstaller copyPathWithAuthentication: relaunchPathToCopy overPath: targetPath temporaryName: nil error: &error] )
-		relaunchPath = targetPath;
+	BOOL copiedRelaunchTool = FALSE;
+	if( useXPC )
+		copiedRelaunchTool = [SUXPC copyPathWithAuthentication: relaunchPathToCopy overPath: targetPath temporaryName: nil error: &error];
+	else
+		copiedRelaunchTool = [SUPlainInstaller copyPathWithAuthentication: relaunchPathToCopy overPath: targetPath temporaryName: nil error: &error];
+	if( copiedRelaunchTool )
+		relaunchPath = [targetPath retain];
 	else
 		[self abortUpdateWithError:[NSError errorWithDomain:SUSparkleErrorDomain code:SURelaunchError userInfo:[NSDictionary dictionaryWithObjectsAndKeys:SULocalizedString(@"An error occurred while extracting the archive. Please try again later.", nil), NSLocalizedDescriptionKey, [NSString stringWithFormat:@"Couldn't copy relauncher (%@) to temporary path (%@)! %@", relaunchPathToCopy, targetPath, (error ? [error localizedDescription] : @"")], NSLocalizedFailureReasonErrorKey, nil]]];
 	
@@ -343,7 +360,11 @@
     if ([[updater delegate] respondsToSelector:@selector(pathToRelaunchForUpdater:)])
         pathToRelaunch = [[updater delegate] pathToRelaunchForUpdater:updater];
     NSString *relaunchToolPath = [relaunchPath stringByAppendingPathComponent: @"/Contents/MacOS/finish_installation"];
-    [NSTask launchedTaskWithLaunchPath: relaunchToolPath arguments:[NSArray arrayWithObjects:[host bundlePath], pathToRelaunch, [NSString stringWithFormat:@"%d", [[NSProcessInfo processInfo] processIdentifier]], tempDir, relaunch ? @"1" : @"0", nil]];
+	NSArray *arguments = [NSArray arrayWithObjects:[host bundlePath], pathToRelaunch, [NSString stringWithFormat:@"%d", [[NSProcessInfo processInfo] processIdentifier]], tempDir, relaunch ? @"1" : @"0", nil];
+	if( useXPC )
+		[SUXPC launchTaskWithLaunchPath: relaunchToolPath arguments:arguments];
+	else
+		[NSTask launchedTaskWithLaunchPath: relaunchToolPath arguments:arguments];
 
     [NSApp terminate:self];
 }
